@@ -19,6 +19,67 @@ button:hover {background:#555;}
 #questionBox, #resultBox {background:rgba(0,0,0,0.85); display:none;}
 #questNum {position:absolute; top:10px; right:10px; font-size:14px; color:#fff;}
 #powerups {position:absolute; top:10px; left:10px; text-align:left; font-size:14px;}
+
+/* ── Mobile Controls ── */
+#mobileControls {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 180px;
+  pointer-events: none;
+  z-index: 100;
+  transition: opacity 0.2s;
+}
+/* D-Pad cluster – bottom left */
+#dpad {
+  position: absolute;
+  bottom: 20px; left: 20px;
+  width: 150px; height: 150px;
+  pointer-events: none;
+}
+.dpad-btn {
+  position: absolute;
+  width: 46px; height: 46px;
+  background: rgba(255,255,255,0.15);
+  border: 2px solid rgba(255,255,255,0.4);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  color: #fff;
+  cursor: pointer;
+  pointer-events: all;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+.dpad-btn:active { background: rgba(255,255,255,0.35); }
+#btn-up    { top:0;   left:52px; }
+#btn-down  { top:104px; left:52px; }
+#btn-left  { top:52px; left:0;   }
+#btn-right { top:52px; left:104px; }
+
+/* Shoot button – bottom right */
+#shootBtn {
+  position: absolute;
+  bottom: 35px; right: 30px;
+  width: 80px; height: 80px;
+  background: rgba(255, 80, 80, 0.35);
+  border: 3px solid rgba(255,100,100,0.7);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: bold; color: #fff;
+  cursor: pointer;
+  pointer-events: all;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  letter-spacing: 1px;
+}
+#shootBtn:active { background: rgba(255,80,80,0.65); }
+
+@media (max-width: 700px), (pointer: coarse) {
+  canvas { width: 100vw !important; height: auto !important; }
+}
 </style>
 </head>
 <body>
@@ -39,6 +100,17 @@ button:hover {background:#555;}
   <div id="questNum"></div>
   <h2 id="qText"></h2>
   <div id="answers"></div>
+</div>
+
+<!-- Mobile Controls -->
+<div id="mobileControls">
+  <div id="dpad">
+    <div class="dpad-btn" id="btn-up">▲</div>
+    <div class="dpad-btn" id="btn-left">◀</div>
+    <div class="dpad-btn" id="btn-right">▶</div>
+    <div class="dpad-btn" id="btn-down">▼</div>
+  </div>
+  <div id="shootBtn">SHOOT</div>
 </div>
 
 <!-- Result Screen -->
@@ -145,6 +217,8 @@ const ui=document.getElementById("ui"),
 
 function startGame(){
   ui.style.display="none";
+  const isMobile = window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 700;
+  if(isMobile) document.getElementById("mobileControls").style.display="block";
   started=true; paused=false; gameOver=false;
   health=100; score=0; nextQuestionScore=50;
   qIndex=0; enemies=[]; bullets=[]; powerups=[];
@@ -267,7 +341,7 @@ function update(){
 
   // Enemies
   enemies.forEach(e=>{
-    const speed = (1 + score/5000) * 0.85;
+    const speed = (1 + score/5556) * 0.85;
     const dx=player.x-e.x, dy=player.y-e.y, d=Math.hypot(dx,dy);
     e.x+=speed*(dx/d);
     e.y+=speed*(dy/d);
@@ -296,7 +370,7 @@ function update(){
   enemies=enemies.filter(e=>!e.dead);
 
   // Spawn enemies
-  const spawnRate = getSpawnRate() + score/10500;
+  const spawnRate = getSpawnRate() + score/11667;
   if(Math.random() < spawnRate){
     const pos = spawnEnemyAtEdge();
     const isBlue = Math.random() < 0.05;
@@ -361,7 +435,8 @@ function draw(){
   } else {
     ctx.fillText("All questions done! Go for a high score!",10,H-40);
   }
-  ctx.fillText("Move (WASD / Arrows) | Shoot (Space / Click)",10,H-20);
+  const isMobile = window.matchMedia("(pointer: coarse)").matches;
+  ctx.fillText(isMobile ? "Use D-pad to move, SHOOT button to fire" : "Move (WASD / Arrows) | Shoot (Space / Click)",10,H-20);
 }
 
 function getClosestEnemy(){
@@ -515,8 +590,58 @@ function showResults(){
 
 function endGame(){
   started=false; paused=true;
+  document.getElementById("mobileControls").style.display="none";
   showResults();
 }
+
+/* ── Mobile Controls ── */
+(function(){
+  const isMobile = () => window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 700;
+  const ctrlDiv = document.getElementById("mobileControls");
+
+  // Only initialise listeners once DOM is ready (script is at end of body so it is)
+  const map = {
+    "btn-up":    "ArrowUp",
+    "btn-down":  "ArrowDown",
+    "btn-left":  "ArrowLeft",
+    "btn-right": "ArrowRight"
+  };
+
+  Object.entries(map).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    const press   = e => { e.preventDefault(); keys[key] = true;  };
+    const release = e => { e.preventDefault(); keys[key] = false; };
+    el.addEventListener("touchstart",  press,   {passive:false});
+    el.addEventListener("touchend",    release, {passive:false});
+    el.addEventListener("touchcancel", release, {passive:false});
+    el.addEventListener("mousedown",   press);
+    el.addEventListener("mouseup",     release);
+    el.addEventListener("mouseleave",  release);
+  });
+
+  const shootEl = document.getElementById("shootBtn");
+  if(shootEl){
+    const fireShot = e => {
+      e.preventDefault();
+      if(started && !paused && !isReloading && currentAmmo > 0) shoot();
+    };
+    shootEl.addEventListener("touchstart", fireShot, {passive:false});
+    shootEl.addEventListener("mousedown",  fireShot);
+  }
+
+  // Hide/show controls based on game state — checked each frame via MutationObserver on questionBox
+  const questionBox = document.getElementById("questionBox");
+  const observer = new MutationObserver(() => {
+    if(!ctrlDiv) return;
+    // Hide d-pad & shoot when question overlay is up (keep overlay readable)
+    const questionVisible = questionBox.style.display !== "none" && questionBox.style.display !== "";
+    ctrlDiv.style.opacity = questionVisible ? "0" : "1";
+    ctrlDiv.style.pointerEvents = questionVisible ? "none" : "all";
+  });
+  observer.observe(questionBox, {attributes: true, attributeFilter: ["style"]});
+})();
 </script>
+
 </body>
 </html>
