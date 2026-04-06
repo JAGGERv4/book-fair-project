@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Genre Survival Diagnostic</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; background: #000; color: #fff;
+  font-family: 'Share Tech Mono', monospace; overflow: hidden;
+  width: 100%; height: 100%; touch-action: none;
+}
+#canvasWrapper {
+  position: fixed; top: 0; left: 0; width: 100vw; height: calc(100vh - 190px);
+  display: flex; align-items: center; justify-content: center;
+}
+@media (pointer: fine) {
+  #canvasWrapper { height: 100vh; }
+}
+canvas { display: block; background: #111; max-width: 100%; max-height: 100%; }
+#ui, #questionBox, #resultBox, #nameEntryBox, #leaderboardBox {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; justify-content: center; align-items: center;
+  flex-direction: column; text-align: center; padding: 16px; z-index: 200;
+}
+#questionBox, #resultBox, #nameEntryBox, #leaderboardBox { background: rgba(0,0,0,0.92); display: none; }
+#ui { background: rgba(0,0,0,0.82); }
+
+/* ── Orbitron headers ── */
+#ui h1, #resultBox h1, #leaderboardBox h1, #nameEntryBox h1 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(18px,5vw,32px); margin: 0 0 10px;
+  letter-spacing: 2px; text-transform: uppercase;
+}
+#ui p { font-size: clamp(13px,3.5vw,15px); max-width: 420px; margin: 0 0 18px; opacity: 0.8; }
+#questionBox h2 { font-size: clamp(15px,4vw,22px); margin: 0 0 16px; max-width: 480px; font-family: 'Orbitron', sans-serif; }
+#resultBox h2 { font-size: clamp(14px,3.5vw,18px); margin: 0 0 6px; font-family: 'Orbitron', sans-serif; letter-spacing: 1px; }
+#explanation { font-size: clamp(12px,3vw,14px); max-width: 380px; margin-top: 10px; opacity:.75; }
+#questNum { position: fixed; top: 10px; right: 12px; font-size: 12px; color: #7ff; z-index: 210; font-family: 'Share Tech Mono', monospace; }
+#powerups { position: fixed; top: 10px; left: 12px; text-align: left; font-size: 12px; z-index: 210; white-space: pre; color: #ff0; }
+
+button {
+  background: transparent; color: #0ff; border: 1px solid #0ff;
+  padding: clamp(10px,2.5vw,12px) clamp(16px,4vw,24px); margin: 6px;
+  cursor: pointer; font-size: clamp(13px,3.5vw,15px); border-radius: 2px;
+  font-family: 'Share Tech Mono', monospace; letter-spacing: 1px;
+  text-transform: uppercase; transition: all 0.15s;
+  clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+}
+button:hover, button:active { background: rgba(0,255,255,0.15); border-color: #fff; color: #fff; }
+button.danger { color: #f55; border-color: #f55; }
+button.danger:hover { background: rgba(255,80,80,0.15); }
+button.gold { color: #ffd700; border-color: #ffd700; }
+button.gold:hover { background: rgba(255,215,0,0.12); }
+
+#answers { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; max-width: 420px; }
+#answers button { width: 100%; }
+#mobileControls {
+  display: none; position: fixed; bottom: 0; left: 0; right: 0;
+  height: 190px; pointer-events: none; z-index: 300; transition: opacity 0.15s;
+}
+#dpad { position: absolute; bottom: 20px; left: 16px; width: 156px; height: 156px; pointer-events: none; }
+.dpad-btn {
+  position: absolute; width: 50px; height: 50px;
+  background: rgba(0,255,255,0.12); border: 1px solid rgba(0,255,255,0.4);
+  border-radius: 4px; display: flex; align-items: center; justify-content: center;
+  font-size: 22px; color: #0ff; cursor: pointer; pointer-events: all;
+  user-select: none; -webkit-user-select: none; touch-action: none;
+}
+.dpad-btn:active { background: rgba(0,255,255,0.3); }
+#btn-up { top:0; left:53px; } #btn-down { top:106px; left:53px; }
+#btn-left { top:53px; left:0; } #btn-right { top:53px; left:106px; }
+#shootBtn {
+  position: absolute; bottom: 30px; right: 24px; width: 88px; height: 88px;
+  background: rgba(255,70,70,0.25); border: 2px solid rgba(255,110,110,0.6);
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: bold; color: #fff; letter-spacing: 1px;
+  cursor: pointer; pointer-events: all; user-select: none; -webkit-user-select: none; touch-action: none;
+  font-family: 'Share Tech Mono', monospace;
+}
+#shootBtn:active { background: rgba(255,70,70,0.6); }
+#reloadBtn {
+  position: absolute; bottom: 55px; left: 50%; transform: translateX(-50%);
+  width: 66px; height: 66px; background: rgba(0,200,255,0.18);
+  border: 1px solid rgba(0,200,255,0.5); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: bold; color: #0ff; letter-spacing: 0.5px;
+  cursor: pointer; pointer-events: all; user-select: none; -webkit-user-select: none; touch-action: none;
+  text-align: center; line-height: 1.2; font-family: 'Share Tech Mono', monospace;
+}
+#reloadBtn:active { background: rgba(0,200,255,0.45); }
+#breakdown { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; font-size: clamp(11px,2.8vw,13px); margin: 8px 0; opacity: 0.7; }
+
+/* ── Name Entry ── */
+#nameEntryBox h1 { color: #0ff; margin-bottom: 20px; }
+#nameEntryBox p { opacity: 0.7; margin-bottom: 16px; font-size: 14px; }
+#nameInput {
+  background: transparent; border: none; border-bottom: 2px solid #0ff;
+  color: #fff; font-size: 24px; font-family: 'Orbitron', sans-serif;
+  text-align: center; width: 260px; padding: 8px; outline: none;
+  letter-spacing: 3px; text-transform: uppercase;
+}
+#nameInput::placeholder { color: rgba(0,255,255,0.3); font-size: 16px; letter-spacing: 1px; }
+#scorePreview { font-size: 13px; color: #7ff; margin: 14px 0 20px; opacity: 0.8; }
+
+/* ── Leaderboard ── */
+#leaderboardBox h1 { color: #ffd700; margin-bottom: 4px; }
+#lbSubtitle { font-size: 12px; color: rgba(255,215,0,0.5); margin-bottom: 20px; letter-spacing: 2px; }
+#lbTable {
+  width: 100%; max-width: 520px; border-collapse: collapse;
+}
+#lbTable th {
+  font-family: 'Orbitron', sans-serif; font-size: 11px; letter-spacing: 2px;
+  color: rgba(255,215,0,0.6); border-bottom: 1px solid rgba(255,215,0,0.2);
+  padding: 6px 10px; text-align: left; text-transform: uppercase;
+}
+#lbTable td {
+  padding: 9px 10px; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.lb-rank { color: rgba(255,255,255,0.4); font-size: 12px; width: 36px; }
+.lb-name { font-family: 'Orbitron', sans-serif; font-size: 13px; letter-spacing: 1px; }
+.lb-score { color: #0ff; font-size: 15px; text-align: right; }
+.lb-genre { color: rgba(255,255,255,0.45); font-size: 11px; text-align: right; }
+.lb-rank-1 .lb-rank { color: #ffd700; }
+.lb-rank-1 .lb-name { color: #ffd700; }
+.lb-rank-2 .lb-rank { color: #c0c0c0; }
+.lb-rank-2 .lb-name { color: #c0c0c0; }
+.lb-rank-3 .lb-rank { color: #cd7f32; }
+.lb-rank-3 .lb-name { color: #cd7f32; }
+.lb-highlight td { background: rgba(0,255,255,0.06); }
+#lbLoading { color: rgba(255,255,255,0.4); font-size: 14px; padding: 30px; }
+#lbButtons { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 18px; }
+
+/* ── UI top-right leaderboard button ── */
+#lbBtn {
+  position: fixed; top: 8px; right: 80px; z-index: 210;
+  background: transparent; color: rgba(255,215,0,0.7); border: 1px solid rgba(255,215,0,0.4);
+  padding: 4px 10px; font-size: 11px; cursor: pointer; border-radius: 2px;
+  font-family: 'Share Tech Mono', monospace; letter-spacing: 1px; display: none;
+}
+#lbBtn:hover { color: #ffd700; border-color: #ffd700; }
+
+/* scan-line overlay */
+#ui::before, #resultBox::before, #nameEntryBox::before, #leaderboardBox::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px);
+  z-index: 1;
+}
+#ui > *, #resultBox > *, #nameEntryBox > *, #leaderboardBox > * { position: relative; z-index: 2; }
+</style>
+</head>
+<body>
+
+<div id="canvasWrapper"><canvas id="canvas" width="800" height="600"></canvas></div>
+<div id="powerups"></div>
+<div id="questNum"></div>
+<button id="lbBtn" onclick="openLeaderboard('mid')">🏆 BOARD</button>
+
+<div id="ui">
+  <h1>🎮 Genre Survival</h1>
+  <p>Move and shoot to gain points. Answer 15 questions to discover your genre—then keep playing for a high score!</p>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+    <button onclick="startGame()">▶ Start</button>
+    <button class="gold" onclick="openLeaderboard('start')">🏆 Leaderboard</button>
+  </div>
+</div>
+
+<div id="questionBox"><h2 id="qText"></h2><div id="answers"></div></div>
+
+<div id="mobileControls">
+  <div id="dpad">
+    <div class="dpad-btn" id="btn-up">▲</div>
+    <div class="dpad-btn" id="btn-left">◀</div>
+    <div class="dpad-btn" id="btn-right">▶</div>
+    <div class="dpad-btn" id="btn-down">▼</div>
+  </div>
+  <div id="reloadBtn">RE<br>LOAD</div>
+  <div id="shootBtn">FIRE</div>
+</div>
+
+<!-- Name Entry -->
+<div id="nameEntryBox">
+  <h1>Mission Complete</h1>
+  <p>Enter your callsign to record your score</p>
+  <input id="nameInput" type="text" maxlength="3" placeholder="AAA" autocomplete="off" spellcheck="false" />
+  <div id="scorePreview"></div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+    <button onclick="submitScore()">✓ Submit Score</button>
+    <button class="danger" onclick="skipSubmit()">✕ Skip</button>
+  </div>
+</div>
+
+<!-- Result -->
+<div id="resultBox">
+  <h2>Your Preferred Genre Is:</h2>
+  <h1 id="finalGenre"></h1>
+  <div id="breakdown"></div>
+  <p id="explanation"></p>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:12px">
+    <button class="gold" onclick="openLeaderboard('result')">🏆 Leaderboard</button>
+    <button onclick="location.reload()">🔄 Restart</button>
+  </div>
+</div>
+
+<!-- Leaderboard -->
+<div id="leaderboardBox">
+  <h1>🏆 Leaderboard</h1>
+  <div id="lbSubtitle">TOP COMMANDERS</div>
+  <div id="lbLoading">Loading scores…</div>
+  <table id="lbTable" style="display:none">
+    <thead>
+      <tr>
+        <th class="lb-rank">#</th>
+        <th>Commander</th>
+        <th style="text-align:right">Score</th>
+        <th style="text-align:right">Genre</th>
+      </tr>
+    </thead>
+    <tbody id="lbBody"></tbody>
+  </table>
+  <div id="lbButtons"></div>
+</div>
+
+<script>
+/* ============================================================
+   GENRE SURVIVAL DIAGNOSTIC – with Shared Leaderboard
+   ============================================================ */
+
+const canvas = document.getElementById("canvas");
+const ctx    = canvas.getContext("2d");
+const NATIVE_W = 800, NATIVE_H = 600;
+let scale = 1;
+
+function isMobileDevice(){ return window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 700; }
+function resizeCanvas(){
+  const ww=window.innerWidth, wh=window.innerHeight;
+  const maxH = isMobileDevice() ? wh-190 : wh;
+  scale = Math.min(ww/NATIVE_W, maxH/NATIVE_H);
+  canvas.style.width  = (NATIVE_W*scale)+"px";
+  canvas.style.height = (NATIVE_H*scale)+"px";
+}
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
+/* ══════════════════════════════════════════════
+   SPRITE FACTORY
+   ══════════════════════════════════════════════ */
+function mkC(w,h){ const c=document.createElement("canvas"); c.width=w; c.height=h; return c; }
+function px(ctx, pixels, defaultColor, size=2){
+  pixels.forEach(([x,y,c])=>{ ctx.fillStyle=c||defaultColor; ctx.fillRect(x*size,y*size,size,size); });
+}
+
+const PLAYER_FRAMES = 5;
+const playerSheet = mkC(32*PLAYER_FRAMES, 32);
+(function(){
+  const c = playerSheet.getContext("2d");
+  const S = 2;
+  const hull = [[3,2],[4,2],[5,2],[6,2],[7,2],[8,2],[9,2],[10,2],[11,2],[12,2],[2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],[9,3],[10,3],[11,3],[12,3],[13,3],[1,4],[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[8,4],[9,4],[10,4],[11,4],[12,4],[13,4],[14,4],[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[7,5],[8,5],[9,5],[10,5],[11,5],[12,5],[13,5],[14,5],[2,6],[3,6],[4,6],[5,6],[6,6],[7,6],[8,6],[9,6],[10,6],[11,6],[12,6],[13,6],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[4,8],[5,8],[6,8],[7,8],[8,8],[9,8],[10,8],[11,8]];
+  const cockpitDark  = [[6,4],[7,4],[8,4],[9,4],[6,5],[7,5],[8,5],[9,5]];
+  const cockpitLight = [[7,4],[8,4],[7,5],[8,5]];
+  const wingL = [[1,5],[0,6],[0,7],[1,6],[2,6]];
+  const wingR = [[14,5],[15,6],[15,7],[14,6],[13,6]];
+  const cannon= [[13,5],[14,5],[15,5]];
+  const thrustColors=[['#f80','#fa0','#ff4'],['#fa0','#ff4','#f80'],['#ff4','#f80','#fa0'],['#fa0','#fa0','#ff4']];
+  for(let f=0;f<4;f++){
+    const ox=f*32; c.save(); c.translate(ox,0);
+    px(c, hull, '#4bf', S); px(c, wingL, '#29d', S); px(c, wingR, '#29d', S);
+    px(c, cockpitDark, '#1a6', S); px(c, cockpitLight,'#aff', S); px(c, cannon, '#8ef', S);
+    const tc=thrustColors[f];
+    [[6,9,tc[0]],[7,9,tc[1]],[8,9,tc[1]],[9,9,tc[0]],[7,10,tc[2]],[8,10,tc[2]],[6,10,tc[1]],[9,10,tc[1]],[7,11,tc[0]],[8,11,tc[0]]].forEach(([x,y,col])=>{c.fillStyle=col;c.fillRect(x*S,y*S,S,S);});
+    c.restore();
+  }
+  {const ox=4*32; c.save(); c.translate(ox,0);
+   px(c, hull,'#6df',S); px(c, wingL,'#29d',S); px(c, wingR,'#29d',S);
+   px(c, cockpitDark,'#0ff',S); px(c, cockpitLight,'#fff',S);
+   [[13,5,'#fff'],[14,5,'#fff'],[15,5,'#ff8'],[15,4,'#fa0'],[15,6,'#fa0'],[14,4,'#ff4'],[14,6,'#ff4']].forEach(([x,y,col])=>{c.fillStyle=col;c.fillRect(x*S,y*S,S,S);}); c.restore();}
+})();
+
+const ENEMY_FRAMES = 4;
+const enemySheet = mkC(32*ENEMY_FRAMES, 32);
+(function(){
+  const c=enemySheet.getContext("2d"); const S=2;
+  const body=[[5,1],[6,1],[7,1],[8,1],[9,1],[10,1],[4,2],[5,2],[6,2],[7,2],[8,2],[9,2],[10,2],[11,2],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],[9,3],[10,3],[11,3],[12,3],[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[8,4],[9,4],[10,4],[11,4],[12,4],[13,4],[2,5],[3,5],[4,5],[5,5],[6,5],[7,5],[8,5],[9,5],[10,5],[11,5],[12,5],[13,5],[3,6],[4,6],[5,6],[6,6],[7,6],[8,6],[9,6],[10,6],[11,6],[12,6],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[5,8],[6,8],[7,8],[8,8],[9,8],[10,8]];
+  const spikes=[[1,3],[0,4],[0,5],[1,5],[14,3],[15,4],[15,5],[14,5]];
+  const eyes=[[5,4],[6,4],[9,4],[10,4],[5,5],[6,5],[9,5],[10,5]];
+  const eyeHL=[[6,4],[10,4]];
+  const bodyC=['#c22','#d33','#e44','#d33'];
+  for(let f=0;f<ENEMY_FRAMES;f++){const ox=f*32;c.save();c.translate(ox,0);px(c,body,bodyC[f],S);px(c,spikes,'#800',S);px(c,eyes,'#f33',S);px(c,eyeHL,'#faa',S);c.restore();}
+})();
+
+const blueSheet = mkC(32*ENEMY_FRAMES, 32);
+(function(){
+  const c=blueSheet.getContext("2d"); const S=2;
+  const body=[[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[3,1],[4,1],[5,1],[6,1],[7,1],[8,1],[9,1],[10,1],[11,1],[12,1],[2,2],[3,2],[4,2],[5,2],[6,2],[7,2],[8,2],[9,2],[10,2],[11,2],[12,2],[13,2],[1,3],[2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],[9,3],[10,3],[11,3],[12,3],[13,3],[14,3],[1,4],[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[8,4],[9,4],[10,4],[11,4],[12,4],[13,4],[14,4],[2,5],[3,5],[4,5],[5,5],[6,5],[7,5],[8,5],[9,5],[10,5],[11,5],[12,5],[13,5],[3,6],[4,6],[5,6],[6,6],[7,6],[8,6],[9,6],[10,6],[11,6],[12,6],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[6,8],[7,8],[8,8],[9,8]];
+  const eyes=[[5,3],[6,3],[9,3],[10,3],[5,4],[6,4],[9,4],[10,4]];
+  const eyeHL=[[6,3],[10,3]];
+  const bodyC=['#27c','#39d','#4ae','#39d'];
+  for(let f=0;f<ENEMY_FRAMES;f++){const ox=f*32;c.save();c.translate(ox,0);px(c,body,bodyC[f],S);px(c,eyes,'#0ff',S);px(c,eyeHL,'#aff',S);c.strokeStyle=`rgba(0,200,255,${0.25+f*0.08})`;c.lineWidth=1.5;c.beginPath();c.arc(15,4,13,0,Math.PI*2);c.stroke();c.restore();}
+})();
+
+const bulletSprite = mkC(18, 6);
+(function(){
+  const c=bulletSprite.getContext("2d");
+  const grd=c.createLinearGradient(0,0,18,0);
+  grd.addColorStop(0,'rgba(255,255,0,0)'); grd.addColorStop(0.25,'rgba(255,220,0,0.9)');
+  grd.addColorStop(0.5,'rgba(255,255,200,1)'); grd.addColorStop(0.75,'rgba(255,220,0,0.9)');
+  grd.addColorStop(1,'rgba(255,255,0,0)');
+  c.fillStyle=grd; c.fillRect(0,1,18,4);
+  c.fillStyle='rgba(255,255,255,0.9)'; c.fillRect(5,2,8,2);
+})();
+
+const PFRAMES = 4;
+const healthSheet = mkC(20*PFRAMES, 20);
+(function(){
+  const c=healthSheet.getContext("2d");
+  for(let f=0;f<PFRAMES;f++){const ox=f*20;const bright=0.5+f*0.15;c.fillStyle=`rgba(0,255,100,${bright})`;c.fillRect(ox+8,0,4,20);c.fillRect(ox+0,8,20,4);c.fillStyle=`rgba(180,255,200,${bright})`;c.fillRect(ox+9,1,2,18);c.fillRect(ox+1,9,18,2);}
+})();
+
+const dualSheet = mkC(20*PFRAMES, 20);
+(function(){
+  const c=dualSheet.getContext("2d");
+  const bolt=[[2,0],[3,0],[4,0],[5,0],[6,0],[5,1],[4,1],[3,1],[3,2],[4,2],[5,2],[6,2],[7,2],[8,2],[7,3],[6,3],[5,3],[5,4],[6,4],[7,4],[8,4],[9,4],[10,4],[9,5],[8,5],[7,5],[6,6],[7,6],[8,6],[9,6],[10,6],[11,6]];
+  for(let f=0;f<PFRAMES;f++){const ox=f*20;c.save();c.translate(ox,0);const a=0.55+f*0.12;px(c,bolt,`rgba(255,${180+f*20},0,${a})`,1);c.restore();}
+})();
+
+const starsBg = mkC(NATIVE_W, NATIVE_H);
+(function(){
+  const c=starsBg.getContext("2d");
+  c.fillStyle='#07071a'; c.fillRect(0,0,NATIVE_W,NATIVE_H);
+  for(let i=0;i<5;i++){const grd=c.createRadialGradient(Math.random()*NATIVE_W,Math.random()*NATIVE_H,0,Math.random()*NATIVE_W,Math.random()*NATIVE_H,150);const h=[200,240,280,180,220][i];grd.addColorStop(0,`hsla(${h},60%,20%,0.18)`);grd.addColorStop(1,'rgba(0,0,0,0)');c.fillStyle=grd;c.fillRect(0,0,NATIVE_W,NATIVE_H);}
+  for(let i=0;i<180;i++){const x=Math.random()*NATIVE_W,y=Math.random()*NATIVE_H,r=Math.random()*1.4;c.fillStyle=`rgba(255,255,255,${0.3+Math.random()*0.7})`;c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.fill();}
+})();
+
+/* ══════════════════════════════════════════════
+   GAME STATE
+   ══════════════════════════════════════════════ */
+let W=NATIVE_W, H=NATIVE_H;
+let player={x:W/2,y:H/2,r:10,speed:3,facing:1,walkFrame:0,walkTimer:0,shootFlash:0};
+let enemies=[], bullets=[], powerups=[], particles=[], asteroids=[];
+let keys={}, score=0, health=100;
+let started=false, paused=false, gameOver=false;
+let nextQuestionScore=50, questionsComplete=false;
+let magSize=20, currentAmmo=magSize;
+let isReloading=false, reloadTime=60, reloadProgress=0;
+let dualShotActive=false, dualShotTimer=0;
+const dualShotDuration=600;
+let lastHealthSpawn=0, lastDualSpawn=0;
+const healthSpawnInterval=1800, dualSpawnInterval=2700;
+let genreScore={Horror:0,Fantasy:0,Puzzle:0,"Sci-Fi":0,Romance:0,"Historical Fiction":0,Dystopian:0};
+
+document.addEventListener("keydown",e=>{
+  keys[e.key]=true;
+  if(e.key===" "&&!paused&&!isReloading&&currentAmmo>0) shoot();
+  if((e.key==="r"||e.key==="R")&&!paused&&!isReloading&&currentAmmo<magSize) startReload();
+});
+document.addEventListener("keyup",e=>keys[e.key]=false);
+canvas.addEventListener("click",()=>{ if(!paused&&!isReloading&&currentAmmo>0) shoot(); });
+
+const questionPool=[
+  {q:"Do you prefer eerie tension or imaginative wonder?",a:[{t:"Eerie tension",add:{Horror:4}},{t:"Imaginative wonder",add:{Fantasy:4}}]},
+  {q:"Would you rather solve intricate puzzles or explore futuristic worlds?",a:[{t:"Solve intricate puzzles",add:{Puzzle:4}},{t:"Explore futuristic worlds",add:{"Sci-Fi":4}}]},
+  {q:"Are you drawn to emotional relationships or historical adventures?",a:[{t:"Emotional relationships",add:{Romance:4}},{t:"Historical adventures",add:{"Historical Fiction":4}}]},
+  {q:"Do you enjoy dystopian survival or magical fantasy?",a:[{t:"Dystopian survival",add:{Dystopian:4}},{t:"Magical fantasy",add:{Fantasy:4}}]},
+  {q:"Would you rather uncover ancient secrets or navigate futuristic tech?",a:[{t:"Uncover ancient secrets",add:{"Historical Fiction":4}},{t:"Navigate futuristic tech",add:{"Sci-Fi":4}}]},
+  {q:"Do you prefer stories about love or stories about societal collapse?",a:[{t:"Stories about love",add:{Romance:4}},{t:"Stories about societal collapse",add:{Dystopian:4}}]},
+  {q:"Are you more interested in logic-driven challenges or emotional journeys?",a:[{t:"Logic-driven challenges",add:{Puzzle:4}},{t:"Emotional journeys",add:{Romance:4}}]},
+  {q:"Do you like exploring haunted places or advanced alien civilizations?",a:[{t:"Haunted places",add:{Horror:4}},{t:"Alien civilizations",add:{"Sci-Fi":4}}]},
+  {q:"Would you rather unravel a royal mystery or survive a post-apocalyptic world?",a:[{t:"Royal mystery",add:{"Historical Fiction":4}},{t:"Post-apocalyptic survival",add:{Dystopian:4}}]},
+  {q:"Do you enjoy crafting spells or hacking futuristic systems?",a:[{t:"Crafting spells",add:{Fantasy:4}},{t:"Hacking futuristic systems",add:{"Sci-Fi":4}}]},
+  {q:"Are you captivated by tragic love or chilling suspense?",a:[{t:"Tragic love",add:{Romance:4}},{t:"Chilling suspense",add:{Horror:4}}]},
+  {q:"Would you rather decode ancient scrolls or rebuild society after collapse?",a:[{t:"Decode ancient scrolls",add:{"Historical Fiction":4}},{t:"Rebuild society",add:{Dystopian:4}}]},
+  {q:"Do you prefer enchanted forests or neon-lit megacities?",a:[{t:"Enchanted forests",add:{Fantasy:4}},{t:"Neon-lit megacities",add:{"Sci-Fi":4}}]},
+  {q:"Are you moved by heartfelt romance or intellectual puzzles?",a:[{t:"Heartfelt romance",add:{Romance:4}},{t:"Intellectual puzzles",add:{Puzzle:4}}]},
+  {q:"Do you find historical drama or dystopian rebellion more compelling?",a:[{t:"Historical drama",add:{"Historical Fiction":4}},{t:"Dystopian rebellion",add:{Dystopian:4}}]}
+];
+let questions=[], totalQuestions=15, qIndex=0;
+
+const uiEl       =document.getElementById("ui");
+const questionBox=document.getElementById("questionBox");
+const qText      =document.getElementById("qText");
+const answersEl  =document.getElementById("answers");
+const questNum   =document.getElementById("questNum");
+const powerupsUI =document.getElementById("powerups");
+
+// Track where leaderboard was opened from
+let lbOpenedFrom = 'start';
+// Track last final genre for submission
+let lastFinalGenre = '';
+// Track submission state
+let pendingScore = null;
+
+function startGame(){
+  uiEl.style.display="none";
+  document.getElementById("lbBtn").style.display="block";
+  resizeCanvas();
+  if(isMobileDevice()) document.getElementById("mobileControls").style.display="block";
+  started=true; paused=false; gameOver=false;
+  health=100; score=0; nextQuestionScore=50;
+  qIndex=0; enemies=[]; bullets=[]; powerups=[]; particles=[]; asteroids=[];
+  questionsComplete=false;
+  currentAmmo=magSize; isReloading=false; reloadProgress=0;
+  dualShotActive=false; dualShotTimer=0;
+  lastHealthSpawn=0; lastDualSpawn=0;
+  player={x:W/2,y:H/2,r:10,speed:3,facing:1,walkFrame:0,walkTimer:0,shootFlash:0};
+  genreScore={Horror:0,Fantasy:0,Puzzle:0,"Sci-Fi":0,Romance:0,"Historical Fiction":0,Dystopian:0};
+  questions=[...questionPool].sort(()=>0.5-Math.random()).slice(0,totalQuestions);
+  spawnEnemies();
+  requestAnimationFrame(loop);
+}
+
+let frameCount=0;
+function loop(){
+  if(!started||gameOver) return;
+  if(!paused){ update(); draw(); updatePowerupUI(); }
+  frameCount++;
+  requestAnimationFrame(loop);
+}
+
+function spawnHitParticles(x,y,color,n=6){
+  for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,sp=1+Math.random()*3;particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:20+Math.random()*15,maxLife:35,color,size:1.5+Math.random()*1.5});}
+}
+function spawnDeathParticles(x,y,color){
+  for(let i=0;i<20;i++){const a=(i/20)*Math.PI*2,sp=1.5+Math.random()*4;particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:30+Math.random()*20,maxLife:50,color,size:2+Math.random()*2});}
+}
+
+function spawnEnemyAtEdge(){
+  const b=20; let x,y; const s=Math.floor(Math.random()*4);
+  if(s===0){x=Math.random()*W;y=-b;} else if(s===1){x=W+b;y=Math.random()*H;} else if(s===2){x=Math.random()*W;y=H+b;} else{x=-b;y=Math.random()*H;}
+  return{x,y};
+}
+function spawnEnemies(){
+  for(let i=0;i<2;i++){const p=spawnEnemyAtEdge();const ib=Math.random()<0.05;enemies.push({x:p.x,y:p.y,r:10,isBlue:ib,health:ib?2:1,frame:0,frameTimer:0,bob:Math.random()*Math.PI*2});}
+}
+function getSpawnRate(){ return 0.011*(1/3)*0.6*(questionsComplete?0.6:0.38)*1.15; }
+
+function spawnAsteroid(){
+  // Pick a random edge to enter from, aimed loosely across screen
+  const edge=Math.floor(Math.random()*4);
+  let x,y,vx,vy;
+  const spd=1.2+Math.random()*2.0;
+  if(edge===0){x=Math.random()*W;y=-50;const a=Math.PI*0.2+Math.random()*Math.PI*0.6;vx=Math.cos(a)*spd;vy=Math.sin(a)*spd;}
+  else if(edge===1){x=W+50;y=Math.random()*H;const a=Math.PI*0.7+Math.random()*Math.PI*0.6;vx=Math.cos(a)*spd;vy=Math.sin(a)*spd;}
+  else if(edge===2){x=Math.random()*W;y=H+50;const a=Math.PI*1.2+Math.random()*Math.PI*0.6;vx=Math.cos(a)*spd;vy=Math.sin(a)*spd;}
+  else{x=-50;y=Math.random()*H;const a=-Math.PI*0.3+Math.random()*Math.PI*0.6;vx=Math.cos(a)*spd;vy=Math.sin(a)*spd;}
+  const r=18+Math.random()*18;
+  // Generate random polygon shape
+  const pts=[];const numPts=7+Math.floor(Math.random()*4);
+  for(let i=0;i<numPts;i++){const ang=(i/numPts)*Math.PI*2;const dist=r*(0.6+Math.random()*0.4);pts.push([Math.cos(ang)*dist,Math.sin(ang)*dist]);}
+  asteroids.push({x,y,vx,vy,r,pts,rot:Math.random()*Math.PI*2,rotSpeed:(Math.random()-0.5)*0.03,hp:Math.ceil(r/14)});
+}
+
+function update(){
+  if(frameCount-lastHealthSpawn>=healthSpawnInterval){powerups.push({x:Math.random()*(W-60)+30,y:Math.random()*(H-60)+30,type:"health",frame:0,ft:0});lastHealthSpawn=frameCount;}
+  if(frameCount-lastDualSpawn>=dualSpawnInterval){powerups.push({x:Math.random()*(W-60)+30,y:Math.random()*(H-60)+30,type:"dual",frame:0,ft:0});lastDualSpawn=frameCount;}
+  if(dualShotActive){dualShotTimer--;if(dualShotTimer<=0)dualShotActive=false;}
+  if(currentAmmo<=0&&!isReloading) startReload();
+  if(isReloading){reloadProgress++;if(reloadProgress>=reloadTime){currentAmmo=magSize;isReloading=false;}}
+  let dx=0,dy=0;
+  if(keys["w"]||keys["ArrowUp"])   dy=-1;
+  if(keys["s"]||keys["ArrowDown"]) dy=1;
+  if(keys["a"]||keys["ArrowLeft"]) dx=-1;
+  if(keys["d"]||keys["ArrowRight"])dx=1;
+  const moving=dx!==0||dy!==0;
+  if(moving){const len=Math.hypot(dx,dy)||1;player.x+=player.speed*(dx/len);player.y+=player.speed*(dy/len);if(dx!==0)player.facing=dx>0?1:-1;}
+  player.x=Math.max(player.r,Math.min(W-player.r,player.x));
+  player.y=Math.max(player.r,Math.min(H-player.r,player.y));
+  if(moving){player.walkTimer++;if(player.walkTimer>=7){player.walkTimer=0;player.walkFrame=(player.walkFrame+1)%4;}} else{player.walkFrame=0;player.walkTimer=0;}
+  if(player.shootFlash>0) player.shootFlash--;
+  powerups.forEach(p=>{p.ft++;if(p.ft>=10){p.ft=0;p.frame=(p.frame+1)%PFRAMES;}});
+  for(let i=powerups.length-1;i>=0;i--){
+    const p=powerups[i];
+    if(Math.hypot(player.x-p.x,player.y-p.y)<player.r+12){
+      if(p.type==="health"){health=Math.min(100,health+25);spawnHitParticles(p.x,p.y,'#0f6',12);}
+      else{dualShotActive=true;dualShotTimer=dualShotDuration;spawnHitParticles(p.x,p.y,'#ff0',12);}
+      powerups.splice(i,1);
+    }
+  }
+  bullets.forEach(b=>{b.x+=b.vx;b.y+=b.vy;if(b.x<0||b.x>W||b.y<0||b.y>H)b.dead=true;});
+  enemies.forEach(e=>{
+    const sp=(1+score/7000)*0.63;
+    const ex=player.x-e.x,ey=player.y-e.y,ed=Math.hypot(ex,ey);
+    e.x+=sp*(ex/ed);e.y+=sp*(ey/ed);
+    e.frameTimer=(e.frameTimer||0)+1;
+    if(e.frameTimer>=9){e.frameTimer=0;e.frame=(e.frame+1)%ENEMY_FRAMES;}
+    if(ed<player.r+e.r){health-=e.isBlue?10:5;spawnHitParticles(player.x,player.y,'#f44',4);if(health<=0)endGame();}
+  });
+  for(const b of bullets){
+    for(const e of enemies){
+      if(Math.hypot(b.x-e.x,b.y-e.y)<e.r+3){
+        b.dead=true;e.health--;spawnHitParticles(e.x,e.y,e.isBlue?'#0ff':'#f80',5);
+        if(e.health<=0){e.dead=true;score+=e.isBlue?50:10;spawnDeathParticles(e.x,e.y,e.isBlue?'#0af':'#f44');}
+      }
+    }
+  }
+  bullets=bullets.filter(b=>!b.dead);
+  enemies=enemies.filter(e=>!e.dead);
+  particles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vx*=0.91;p.vy*=0.91;p.life--;});
+  particles=particles.filter(p=>p.life>0);
+  const sr=getSpawnRate()+score/22609;
+  if(enemies.length<15&&Math.random()<sr){const p=spawnEnemyAtEdge();const ib=Math.random()<0.05;enemies.push({x:p.x,y:p.y,r:10,isBlue:ib,health:ib?2:1,frame:0,frameTimer:0,bob:Math.random()*Math.PI*2});}
+  // ── Asteroids ──
+  if(Math.random()<0.003+score/533333){spawnAsteroid();}
+  for(let i=asteroids.length-1;i>=0;i--){
+    const a=asteroids[i];
+    a.x+=a.vx; a.y+=a.vy; a.rot+=a.rotSpeed;
+    if(a.x<-120||a.x>W+120||a.y<-120||a.y>H+120){asteroids.splice(i,1);continue;}
+    if(Math.hypot(player.x-a.x,player.y-a.y)<player.r+a.r){
+      health-=18; spawnHitParticles(player.x,player.y,'#a86',8);
+      spawnDeathParticles(a.x,a.y,'#a86');
+      asteroids.splice(i,1);
+      if(health<=0)endGame();
+      continue;
+    }
+    let hit=false;
+    for(let j=bullets.length-1;j>=0;j--){
+      const b=bullets[j];
+      if(Math.hypot(b.x-a.x,b.y-a.y)<a.r+3){
+        bullets.splice(j,1);
+        spawnHitParticles(a.x,a.y,'#c97',5);
+        a.hp--;
+        if(a.hp<=0){spawnDeathParticles(a.x,a.y,'#a86');score+=5;asteroids.splice(i,1);}
+        hit=true; break;
+      }
+    }
+  }
+  if(!questionsComplete&&score>=nextQuestionScore&&qIndex<totalQuestions){askQuestion();nextQuestionScore+=100;}
+}
+
+function draw(){
+  ctx.drawImage(starsBg,0,0);
+  particles.forEach(p=>{const a=p.life/p.maxLife;ctx.save();ctx.globalAlpha=a;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.size*(0.5+a*0.5),0,Math.PI*2);ctx.fill();ctx.restore();});
+  // ── Asteroids ──
+  asteroids.forEach(a=>{
+    ctx.save();
+    ctx.translate(a.x,a.y);ctx.rotate(a.rot);
+    // Warning glow when near player
+    const distToPlayer=Math.hypot(a.x-player.x,a.y-player.y);
+    if(distToPlayer<100){ctx.shadowColor='#f80';ctx.shadowBlur=10+8*Math.sin(frameCount*0.2);}
+    ctx.beginPath();
+    ctx.moveTo(a.pts[0][0],a.pts[0][1]);
+    for(let i=1;i<a.pts.length;i++) ctx.lineTo(a.pts[i][0],a.pts[i][1]);
+    ctx.closePath();
+    ctx.fillStyle='#4a3a2a';ctx.fill();
+    ctx.strokeStyle='#8a6a4a';ctx.lineWidth=1.5;ctx.stroke();
+    // Highlight edge
+    ctx.strokeStyle='rgba(180,140,90,0.3)';ctx.lineWidth=0.8;ctx.stroke();
+    ctx.restore();
+  });
+  powerups.forEach(p=>{
+    const sheet=p.type==="health"?healthSheet:dualSheet;
+    const sx=p.frame*20;
+    const pulse=0.5+0.3*Math.sin(frameCount*0.1);
+    ctx.save();ctx.globalAlpha=pulse*0.4;ctx.fillStyle=p.type==="health"?"#0f8":"#ff0";
+    ctx.beginPath();ctx.arc(p.x,p.y,16,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+    ctx.drawImage(sheet,sx,0,20,20,p.x-10,p.y-10,20,20);ctx.restore();
+  });
+  bullets.forEach(b=>{const angle=Math.atan2(b.vy,b.vx);ctx.save();ctx.translate(b.x,b.y);ctx.rotate(angle);ctx.drawImage(bulletSprite,-9,-3);ctx.restore();});
+  enemies.forEach(e=>{
+    const sheet=e.isBlue?blueSheet:enemySheet;
+    const bob=Math.sin(frameCount*0.07+e.bob)*2.5;
+    const sx=e.frame*32;
+    const flip=e.x>player.x?-1:1;
+    ctx.save();ctx.translate(e.x,e.y+bob);
+    ctx.save();ctx.globalAlpha=0.2;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(0,13,11,3,0,0,Math.PI*2);ctx.fill();ctx.restore();
+    ctx.scale(flip,1);ctx.drawImage(sheet,sx,0,32,32,-16,-14,32,32);ctx.restore();
+  });
+  {
+    const frameIdx=player.shootFlash>0?4:player.walkFrame;
+    const sx=frameIdx*32;
+    ctx.save();ctx.translate(player.x,player.y);ctx.scale(player.facing,1);
+    ctx.save();ctx.globalAlpha=0.25;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(0,15,12,3,0,0,Math.PI*2);ctx.fill();ctx.restore();
+    ctx.shadowColor='#4bf';ctx.shadowBlur=14+6*Math.sin(frameCount*0.15);
+    ctx.drawImage(playerSheet,sx,0,32,32,-16,-14,32,32);ctx.restore();
+  }
+  if(isReloading){
+    const bw=44,bh=5,prog=reloadProgress/reloadTime;
+    ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(player.x-bw/2-1,player.y-player.r-15,bw+2,bh+2);
+    ctx.fillStyle='#333';ctx.fillRect(player.x-bw/2,player.y-player.r-14,bw,bh);
+    ctx.fillStyle='#0df';ctx.fillRect(player.x-bw/2,player.y-player.r-14,bw*prog,bh);
+  }
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#7f7';ctx.font='bold 14px "Share Tech Mono", monospace';
+  ctx.fillText("Score: "+Math.floor(score),10,22);
+  ctx.fillText("Health: "+Math.floor(health),10,42);
+  ctx.fillText("Ammo: "+currentAmmo+"/"+magSize+(isReloading?" (reloading…)":""),10,62);
+  ctx.fillStyle='rgba(255,255,255,0.35)';
+  ctx.font=isMobileDevice()?'11px "Share Tech Mono"':'20px "Share Tech Mono"';
+  ctx.fillText(isMobileDevice()?"D-pad: move  |  FIRE: shoot  |  RELOAD: reload":"WASD/Arrows: move  |  Space/Click: shoot  |  R: reload",10,H-10);
+}
+
+function getClosestEnemy(){let cl=null,md=Infinity;for(const e of enemies){const d=Math.hypot(e.x-player.x,e.y-player.y);if(d<md){md=d;cl=e;}}return cl;}
+function getRandomNearbyEnemy(mx=200){const nb=enemies.filter(e=>Math.hypot(e.x-player.x,e.y-player.y)<=mx);return nb.length?nb[Math.floor(Math.random()*nb.length)]:null;}
+function startReload(){if(isReloading||currentAmmo===magSize)return;isReloading=true;reloadProgress=0;}
+function shoot(){
+  if(isReloading||currentAmmo<=0)return;
+  currentAmmo--;player.shootFlash=7;
+  const pt=getClosestEnemy();const a1=pt?Math.atan2(pt.y-player.y,pt.x-player.x):0;
+  bullets.push({x:player.x,y:player.y,vx:Math.cos(a1)*8,vy:Math.sin(a1)*8});
+  if(dualShotActive){currentAmmo=Math.max(0,currentAmmo-1);const st=getRandomNearbyEnemy(200);const a2=st?Math.atan2(st.y-player.y,st.x-player.x):a1+(Math.random()-0.5)*0.5;bullets.push({x:player.x,y:player.y,vx:Math.cos(a2)*8,vy:Math.sin(a2)*8});}
+}
+function pushEnemiesAway(){enemies.forEach(e=>{const dx=e.x-player.x,dy=e.y-player.y,d=Math.hypot(dx,dy);if(d>0){const nx=dx/d,ny=dy/d;e.x=player.x+nx*(d+150);e.y=player.y+ny*(d+150);}});}
+function askQuestion(){
+  paused=true;pushEnemiesAway();
+  questionBox.style.display="flex";
+  questNum.textContent=`Question ${Math.min(qIndex+1,totalQuestions)} of ${totalQuestions}`;
+  if(qIndex>=questions.length){
+    qText.textContent="All 15 questions completed!";questNum.textContent="";answersEl.innerHTML="";
+    const btn=document.createElement("button");btn.textContent="Continue Playing for High Score!";
+    btn.onclick=()=>{questionsComplete=true;questionBox.style.display="none";paused=false;};
+    answersEl.appendChild(btn);return;
+  }
+  const q=questions[qIndex];qText.textContent=q.q;answersEl.innerHTML="";
+  q.a.forEach(opt=>{
+    const b=document.createElement("button");b.textContent=opt.t;
+    b.onclick=()=>{for(const g in opt.add)genreScore[g]+=opt.add[g];qIndex++;questionBox.style.display="none";questNum.textContent="";paused=false;};
+    answersEl.appendChild(b);
+  });
+}
+function updatePowerupUI(){powerupsUI.textContent=dualShotActive?"⚡ DUAL SHOT: "+Math.ceil(dualShotTimer/60)+"s":"";}
+
+function showResults(){
+  questionBox.style.display="none";started=false;paused=true;gameOver=true;
+  const total=Object.values(genreScore).reduce((a,b)=>a+b,0)||1;
+  const sorted=Object.entries(genreScore).sort((a,b)=>b[1]-a[1]);
+  lastFinalGenre = sorted[0][0];
+  document.getElementById("finalGenre").textContent=lastFinalGenre;
+  document.getElementById("breakdown").innerHTML=sorted.map(([g,v])=>`<div>${g}: ${(v/total*100).toFixed(1)}%</div>`).join("");
+  const explain={Horror:"You're drawn to suspense, fear, and psychological tension—Horror is your match.",Fantasy:"You love magic, wonder, and mythical realms—Fantasy fits your imagination.",Puzzle:"You thrive on logic, patterns, and problem-solving—Puzzle games suit your mind.","Sci-Fi":"You're fascinated by technology, space, and future possibilities—Sci-Fi calls to you.",Romance:"You value emotional depth, connection, and heartfelt stories—Romance resonates with you.","Historical Fiction":"You enjoy rich settings, real-world drama, and past eras—Historical Fiction fits your taste.",Dystopian:"You're intrigued by societal collapse, rebellion, and moral complexity—Dystopian themes speak to you."};
+  document.getElementById("explanation").textContent=explain[lastFinalGenre];
+}
+
+function endGame(){
+  started=false;paused=true;
+  document.getElementById("mobileControls").style.display="none";
+  document.getElementById("lbBtn").style.display="none";
+  // Store pending score and show name entry
+  pendingScore = Math.floor(score);
+  showNameEntry();
+}
+
+/* ══════════════════════════════════════════════
+   NAME ENTRY & LEADERBOARD
+   ══════════════════════════════════════════════ */
+
+function showNameEntry(){
+  // Compute genre result first
+  const total=Object.values(genreScore).reduce((a,b)=>a+b,0)||1;
+  const sorted=Object.entries(genreScore).sort((a,b)=>b[1]-a[1]);
+  lastFinalGenre = sorted[0][0];
+
+  document.getElementById("scorePreview").textContent =
+    `Score: ${pendingScore}  ·  Genre: ${lastFinalGenre}`;
+  document.getElementById("nameInput").value = "";
+  document.getElementById("nameEntryBox").style.display = "flex";
+  setTimeout(()=>document.getElementById("nameInput").focus(), 100);
+}
+
+document.getElementById("nameInput").addEventListener("keydown", e=>{
+  if(e.key === "Enter") submitScore();
+});
+
+async function submitScore(){
+  const raw = document.getElementById("nameInput").value.trim().toUpperCase();
+  const name = raw.replace(/[^A-Z0-9 _\-\.]/g, '').slice(0,3) || "AAA";
+  document.getElementById("nameEntryBox").style.display = "none";
+  await saveScore(name, pendingScore, lastFinalGenre);
+  showResults();
+  document.getElementById("resultBox").style.display = "flex";
+}
+
+function skipSubmit(){
+  document.getElementById("nameEntryBox").style.display = "none";
+  showResults();
+  document.getElementById("resultBox").style.display = "flex";
+}
+
+/* ── Shared Storage Leaderboard ── */
+const LB_KEY = "leaderboard_v1";
+const MAX_ENTRIES = 15;
+
+async function loadScores(){
+  try {
+    const result = await window.storage.get(LB_KEY, true);
+    return result ? JSON.parse(result.value) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveScore(name, score, genre){
+  try {
+    let scores = await loadScores();
+    const ts = Date.now();
+    scores.push({ name, score, genre, ts });
+    scores.sort((a,b)=>b.score-a.score);
+    scores = scores.slice(0, MAX_ENTRIES);
+    await window.storage.set(LB_KEY, JSON.stringify(scores), true);
+    return scores;
+  } catch(e) {
+    console.warn("Leaderboard save failed:", e);
+    return [];
+  }
+}
+
+async function openLeaderboard(from){
+  lbOpenedFrom = from;
+  const box = document.getElementById("leaderboardBox");
+  const loading = document.getElementById("lbLoading");
+  const table = document.getElementById("lbTable");
+  const body = document.getElementById("lbBody");
+  const btns = document.getElementById("lbButtons");
+
+  // Hide result/ui boxes while showing leaderboard
+  if(from === 'result') document.getElementById("resultBox").style.display = "none";
+  if(from === 'start')  document.getElementById("ui").style.display = "none";
+
+  box.style.display = "flex";
+  loading.style.display = "block";
+  table.style.display = "none";
+  body.innerHTML = "";
+  btns.innerHTML = "";
+
+  const scores = await loadScores();
+
+  loading.style.display = "none";
+  table.style.display = "block";
+
+  if(scores.length === 0){
+    body.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:24px;opacity:0.4;font-size:13px">No scores yet. Be the first!</td></tr>`;
+  } else {
+    scores.forEach((entry, i) => {
+      const tr = document.createElement("tr");
+      const rankClass = i===0?"lb-rank-1":i===1?"lb-rank-2":i===2?"lb-rank-3":"";
+      // Highlight current score (most recent matching score)
+      const isCurrent = (from === 'result' && entry.score === pendingScore && entry.name !== "ANON" && i === scores.findIndex(s=>s.score===pendingScore));
+      tr.className = [rankClass, isCurrent?"lb-highlight":""].join(" ").trim();
+      const medal = i===0?"🥇":i===1?"🥈":i===2?"🥉":"";
+      tr.innerHTML = `
+        <td class="lb-rank">${medal||("#"+(i+1))}</td>
+        <td class="lb-name">${escHtml(entry.name)}</td>
+        <td class="lb-score">${entry.score.toLocaleString()}</td>
+        <td class="lb-genre">${escHtml(entry.genre||"")}</td>
+      `;
+      body.appendChild(tr);
+    });
+  }
+
+  // Buttons
+  if(from === 'result'){
+    btns.innerHTML = `
+      <button onclick="closeLeaderboard()">← Back to Results</button>
+      <button onclick="location.reload()">🔄 Play Again</button>
+    `;
+  } else if(from === 'start'){
+    btns.innerHTML = `<button onclick="closeLeaderboard()">← Back</button>`;
+  } else if(from === 'mid'){
+    btns.innerHTML = `<button onclick="closeLeaderboard()">← Resume</button>`;
+  }
+}
+
+function closeLeaderboard(){
+  document.getElementById("leaderboardBox").style.display = "none";
+  if(lbOpenedFrom === 'result'){
+    document.getElementById("resultBox").style.display = "flex";
+  } else if(lbOpenedFrom === 'start'){
+    document.getElementById("ui").style.display = "flex";
+  } else if(lbOpenedFrom === 'mid'){
+    // Resume game
+    paused = false;
+  }
+}
+
+function escHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── Mobile Controls ── */
+(function(){
+  const ctrlDiv=document.getElementById("mobileControls");
+  const qBox=document.getElementById("questionBox");
+  const dMap={"btn-up":"ArrowUp","btn-down":"ArrowDown","btn-left":"ArrowLeft","btn-right":"ArrowRight"};
+  Object.entries(dMap).forEach(([id,key])=>{
+    const el=document.getElementById(id);if(!el)return;
+    const press=e=>{e.preventDefault();keys[key]=true;};
+    const release=e=>{e.preventDefault();keys[key]=false;};
+    el.addEventListener("touchstart",press,{passive:false});el.addEventListener("touchend",release,{passive:false});el.addEventListener("touchcancel",release,{passive:false});
+    el.addEventListener("mousedown",press);el.addEventListener("mouseup",release);el.addEventListener("mouseleave",release);
+  });
+  const shootEl=document.getElementById("shootBtn");
+  const reloadEl=document.getElementById("reloadBtn");
+  if(shootEl){const fire=e=>{e.preventDefault();if(started&&!paused&&!isReloading&&currentAmmo>0)shoot();};shootEl.addEventListener("touchstart",fire,{passive:false});shootEl.addEventListener("mousedown",fire);}
+  if(reloadEl){const doR=e=>{e.preventDefault();if(started&&!paused)startReload();};reloadEl.addEventListener("touchstart",doR,{passive:false});reloadEl.addEventListener("mousedown",doR);}
+  new MutationObserver(()=>{const vis=qBox.style.display!=="none"&&qBox.style.display!=="";ctrlDiv.style.opacity=vis?"0":"1";ctrlDiv.style.pointerEvents=vis?"none":"all";}).observe(qBox,{attributes:true,attributeFilter:["style"]});
+})();
+</script>
+</body>
+</html>
